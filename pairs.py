@@ -129,7 +129,8 @@ class Pairs:
 		"""
 		Computes the drawdown of portfolio
 		"""
-		drawdown = np.sum(np.sign(self.p)*(data.ix[-1,:] - self.prices)/self.prices)
+		#drawdown = np.sum(np.sign(self.p)*(data.ix[-1,:] - self.prices)/self.prices)
+		drawdown = np.sum(self.p*(data.ix[-1,:] - self.prices))/np.sum(np.abs(self.p)*self.prices)
 		return drawdown
 
 	def open_signal(self,data):
@@ -246,7 +247,7 @@ def mySettings():
 
 	### Cointegrating banks
 	#settings['markets']      = ['CASH', 'JPM', 'SCHW'] 	# ==> SR:  0.7553  
-	#settings['markets']      = ['CASH', 'MS', 'STT'] 		# ==> SR:  0.4886
+	settings['markets']      = ['CASH', 'MS', 'STT'] 		# ==> SR:  0.4886
 	#settings['markets']      = ['CASH', 'ETFC', 'HBAN'] 	# ==> SR:  1.3376
 	
 	### Cointegrating tech companies
@@ -351,6 +352,7 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, settings):
 	p[1:3] =  settings['pairs']['pair1'].get_positions(data) # 
 	if np.any(p[1:] != 0.): p[0] = 0.0 # ... set CASH to 0 if capital invested
 	settings['p'] = p # ... save p
+
 
 
 	return p, settings

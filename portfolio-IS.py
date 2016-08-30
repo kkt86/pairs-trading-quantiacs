@@ -270,17 +270,13 @@ def mySettings():
 
 
 	settings['markets'] = ['CASH', 'JPM', 'SCHW', \
-							'MS', 'STT', \
 							'ETFC', 'HBAN', \
 							'AAPL', 'APH', \
 							'FB', 'QCOM', \
 							'HPQ', 'FOXA', \
-							'CRM', 'PBI', \
-							'FLIR', 'NWSA', \
 							'GGP', 'MAC', \
 							'MRK', 'MJN', \
 							'AET', 'HUM', \
-							'EMR', 'MAS', \
 							'AME', 'HRS', \
 							'HAL', 'NBR', \
 							'CMS', 'XEL', \
@@ -306,38 +302,30 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, settings):
 
 	### Preprocess stock data
 	data_JPM_SCHW = preprocess_data(DATE, CLOSE[:,1:3])
-	data_MS_STT = preprocess_data(DATE, CLOSE[:,3:5])
-	data_ETFC_HBAN = preprocess_data(DATE, CLOSE[:,5:7])
-	data_AAPL_APH = preprocess_data(DATE, CLOSE[:,7:9])
-	data_FB_QCOM = preprocess_data(DATE, CLOSE[:,9:11])
-	data_HPQ_FOXA = preprocess_data(DATE, CLOSE[:,11:13])
-	data_CRM_PBI = preprocess_data(DATE, CLOSE[:,13:15])
-	data_FLIR_NWSA = preprocess_data(DATE, CLOSE[:,15:17])
-	data_GGP_MAC = preprocess_data(DATE, CLOSE[:,17:19])
-	data_MRK_MJN = preprocess_data(DATE, CLOSE[:,19:21])
-	data_AET_HUM = preprocess_data(DATE, CLOSE[:,21:23])
-	data_EMR_MAS = preprocess_data(DATE, CLOSE[:,23:25])
-	data_AME_HRS = preprocess_data(DATE, CLOSE[:,25:27])
-	data_HAL_NBR = preprocess_data(DATE, CLOSE[:,27:29])
-	data_CMS_XEL = preprocess_data(DATE, CLOSE[:,29:31])
-	data_D_PSX = preprocess_data(DATE, CLOSE[:,31:33])
-	data_DUK_FE = preprocess_data(DATE, CLOSE[:,33:35])
+	data_ETFC_HBAN = preprocess_data(DATE, CLOSE[:,3:5])
+	data_AAPL_APH = preprocess_data(DATE, CLOSE[:,5:7])
+	data_FB_QCOM = preprocess_data(DATE, CLOSE[:,7:9])
+	data_HPQ_FOXA = preprocess_data(DATE, CLOSE[:,9:11])
+	data_GGP_MAC = preprocess_data(DATE, CLOSE[:,11:13])
+	data_MRK_MJN = preprocess_data(DATE, CLOSE[:,13:15])
+	data_AET_HUM = preprocess_data(DATE, CLOSE[:,15:17])
+	data_AME_HRS = preprocess_data(DATE, CLOSE[:,17:19])
+	data_HAL_NBR = preprocess_data(DATE, CLOSE[:,19:21])
+	data_CMS_XEL = preprocess_data(DATE, CLOSE[:,21:23])
+	data_D_PSX = preprocess_data(DATE, CLOSE[:,23:25])
+	data_DUK_FE = preprocess_data(DATE, CLOSE[:,25:27])
 
 
 	### Assign pairs into settings
 	if len(settings['pairs']) == 0:
 		settings['pairs']['JPM_SCHW'] = Pairs(data_JPM_SCHW)
-		settings['pairs']['MS_STT'] = Pairs(data_MS_STT)
 		settings['pairs']['ETFC_HBAN'] = Pairs(data_ETFC_HBAN)
 		settings['pairs']['AAPL_APH'] = Pairs(data_AAPL_APH)
 		settings['pairs']['FB_QCOM'] = Pairs(data_FB_QCOM)
 		settings['pairs']['HPQ_FOXA'] = Pairs(data_HPQ_FOXA)
-		settings['pairs']['CRM_PBI'] = Pairs(data_CRM_PBI)
-		settings['pairs']['FLIR_NWSA'] = Pairs(data_FLIR_NWSA)
 		settings['pairs']['GGP_MAC'] = Pairs(data_GGP_MAC)
 		settings['pairs']['MRK_MJN'] = Pairs(data_MRK_MJN)
 		settings['pairs']['AET_HUM'] = Pairs(data_AET_HUM)
-		settings['pairs']['EMR_MAS'] = Pairs(data_EMR_MAS)
 		settings['pairs']['AME_HRS'] = Pairs(data_AME_HRS)
 		settings['pairs']['HAL_NBR'] = Pairs(data_HAL_NBR)
 		settings['pairs']['CMS_XEL'] = Pairs(data_CMS_XEL)
@@ -348,17 +336,13 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, settings):
 	### Update parameters for each pair (on a daily basis)
 	if toDate(DATE[-1]).day == 1:
 		settings['pairs']['JPM_SCHW'].update_all(data_JPM_SCHW)
-		settings['pairs']['MS_STT'].update_all(data_MS_STT)
 		settings['pairs']['ETFC_HBAN'].update_all(data_ETFC_HBAN)
 		settings['pairs']['AAPL_APH'].update_all(data_AAPL_APH)
 		settings['pairs']['FB_QCOM'].update_all(data_FB_QCOM)
 		settings['pairs']['HPQ_FOXA'].update_all(data_HPQ_FOXA)
-		settings['pairs']['CRM_PBI'].update_all(data_CRM_PBI)
-		settings['pairs']['FLIR_NWSA'].update_all(data_FLIR_NWSA)
 		settings['pairs']['GGP_MAC'].update_all(data_GGP_MAC)
 		settings['pairs']['MRK_MJN'].update_all(data_MRK_MJN)
 		settings['pairs']['AET_HUM'].update_all(data_AET_HUM)
-		settings['pairs']['EMR_MAS'].update_all(data_EMR_MAS)
 		settings['pairs']['AME_HRS'].update_all(data_AME_HRS)
 		settings['pairs']['HAL_NBR'].update_all(data_HAL_NBR)
 		settings['pairs']['CMS_XEL'].update_all(data_CMS_XEL)
@@ -373,22 +357,18 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, settings):
 	p[0] = 1.
 
 	p[1:3] = settings['pairs']['JPM_SCHW'].get_positions(data_JPM_SCHW)
-	p[3:5] = settings['pairs']['MS_STT'].get_positions(data_MS_STT)
-	p[5:7] = settings['pairs']['ETFC_HBAN'].get_positions(data_ETFC_HBAN)
-	p[7:9] = settings['pairs']['AAPL_APH'].get_positions(data_AAPL_APH)
-	p[9:11] = settings['pairs']['FB_QCOM'].get_positions(data_FB_QCOM)
-	p[11:13] = settings['pairs']['HPQ_FOXA'].get_positions(data_HPQ_FOXA)
-	p[13:15] = settings['pairs']['CRM_PBI'].get_positions(data_CRM_PBI)
-	p[15:17] = settings['pairs']['FLIR_NWSA'].get_positions(data_FLIR_NWSA)
-	p[17:19] = settings['pairs']['GGP_MAC'].get_positions(data_GGP_MAC)
-	p[19:21] = settings['pairs']['MRK_MJN'].get_positions(data_MRK_MJN)
-	p[21:23] = settings['pairs']['AET_HUM'].get_positions(data_AET_HUM)
-	p[23:25] = settings['pairs']['EMR_MAS'].get_positions(data_EMR_MAS)
-	p[25:27] = settings['pairs']['AME_HRS'].get_positions(data_AME_HRS)
-	p[27:29] = settings['pairs']['HAL_NBR'].get_positions(data_HAL_NBR)
-	p[29:31] = settings['pairs']['CMS_XEL'].get_positions(data_CMS_XEL)
-	p[31:33] = settings['pairs']['D_PSX'].get_positions(data_D_PSX)
-	p[33:35] = settings['pairs']['DUK_FE'].get_positions(data_DUK_FE)
+	p[3:5] = settings['pairs']['ETFC_HBAN'].get_positions(data_ETFC_HBAN)
+	p[5:7] = settings['pairs']['AAPL_APH'].get_positions(data_AAPL_APH)
+	p[7:9] = settings['pairs']['FB_QCOM'].get_positions(data_FB_QCOM)
+	p[9:11] = settings['pairs']['HPQ_FOXA'].get_positions(data_HPQ_FOXA)
+	p[11:13] = settings['pairs']['GGP_MAC'].get_positions(data_GGP_MAC)
+	p[13:15] = settings['pairs']['MRK_MJN'].get_positions(data_MRK_MJN)
+	p[15:17] = settings['pairs']['AET_HUM'].get_positions(data_AET_HUM)
+	p[17:19] = settings['pairs']['AME_HRS'].get_positions(data_AME_HRS)
+	p[19:21] = settings['pairs']['HAL_NBR'].get_positions(data_HAL_NBR)
+	p[21:23] = settings['pairs']['CMS_XEL'].get_positions(data_CMS_XEL)
+	p[23:25] = settings['pairs']['D_PSX'].get_positions(data_D_PSX)
+	p[25:27] = settings['pairs']['DUK_FE'].get_positions(data_DUK_FE)
 
 
 	if np.any(p[1:] != 0.): p[0] = 0.0 # ... set CASH to 0 if capital invested somewhere else
