@@ -3,13 +3,15 @@ import pandas as pd
 import datetime
 
 
-#================================== DEFINE PAIRS CLASS ==================================
+np.arange
+
+
+#================================== DEFINE PAIRS CLASS ====================
 
 class Pairs:
-	
-	def __init__(self,data):
-		
-		### Extract date from data
+
+	def __init__(self, data):
+		# Extract date from data
 		self.date = data.index[-1]
 
 		### Set initial position to NONE
@@ -26,9 +28,8 @@ class Pairs:
 
 		self.position = 'NONE'
 		self.p = np.array([0., 0.])
-		self.prices = np.array([0., 0.])
-		self.max_drawdown = -0.1
-		self.value_portfolio = 0.0
+		self.max_drawdown = -0.2
+		self.max_value_portfolio = np.nan
 
 		### Compute beta and hurst exponent
 		self.beta = self.compute_beta(data)
@@ -129,8 +130,13 @@ class Pairs:
 		"""
 		Computes the drawdown of portfolio
 		"""
-		#drawdown = np.sum(np.sign(self.p)*(data.ix[-1,:] - self.prices)/self.prices)
-		drawdown = np.sum(self.p*(data.ix[-1,:] - self.prices))/np.sum(np.abs(self.p)*self.prices)
+
+		### update max_value_portfolio
+		weights = self.p/np.sum(np.abs(self.p))
+		value_portfolio = np.sum(weights*data.ix[-1,:])
+		self.max_value_portfolio = np.maximum(self.max_value_portfolio, value_portfolio)
+
+		drawdown = (value_portfolio - self.max_value_portfolio)/self.max_value_portfolio
 		return drawdown
 
 	def open_signal(self,data):
@@ -157,6 +163,8 @@ class Pairs:
 
 		### update lookback period and beta and compute the zscore
 		zscore = self.compute_zscore(data)[-1]
+
+		self.compute_drawdown(data)
 
 		if self.position == 'ENTERED_ABOVE' and zscore <= self.close_high:
 			return 'CLOSE'
@@ -188,13 +196,15 @@ class Pairs:
 				p = np.array([self.beta, -1.])
 				self.position = 'ENTERED_ABOVE'
 				self.p = p
-				self.prices = data.ix[-1,:]
+				weights = self.p/np.sum(np.abs(self.p))
+				self.max_value_portfolio = np.sum(weights*data.ix[-1,:])
 
 			if open_signal == 'ENTER_BELOW':
 				p = np.array([-self.beta, 1.])
 				self.position = 'ENTERED_BELOW'
 				self.p = p
-				self.prices = data.ix[-1,:]
+				weights = self.p/np.sum(np.abs(self.p))
+				self.max_value_portfolio = np.sum(weights*data.ix[-1,:])
 
 		### If position already entered, evaluate exit signals
 		if self.position != 'NONE':
@@ -204,19 +214,22 @@ class Pairs:
 				p = np.array([0., 0.])
 				self.position = 'NONE'
 				self.p = p
-				self.prices = np.array([0., 0.])
+				#self.prices = np.array([0., 0.])
+				self.max_value_portfolio = np.nan
 
 			if self.position == 'ENTERED_BELOW' and close_signal == 'CLOSE':
 				p = np.array([0., 0.])
 				self.position = 'NONE'
 				self.p = p
-				self.prices = np.array([0., 0.])
+				#self.prices = np.array([0., 0.])
+				self.max_value_portfolio = np.nan
 
 			if close_signal == 'CLOSE_MAX_DD_EXCEEDED':
 				p = np.array([0., 0.])
 				self.position = 'MAX_DD_EXCEEDED'
 				self.p = p
-				self.prices = np.array([0., 0.])
+				#self.prices = np.array([0., 0.])
+				self.max_value_portfolio = np.nan
 
 			if self.position == 'MAX_DD_EXCEEDED':
 				zscore = self.compute_zscore(data)[-1]
@@ -246,64 +259,65 @@ def mySettings():
 	settings={}
 
 	### Cointegrating banks
-	#settings['markets']      = ['CASH', 'JPM', 'SCHW'] 	# ==> SR:  0.7553  
-	settings['markets']      = ['CASH', 'MS', 'STT'] 		# ==> SR:  0.4886
-	#settings['markets']      = ['CASH', 'ETFC', 'HBAN'] 	# ==> SR:  1.3376
+	settings['markets']      = ['CASH', 'JPM', 'SCHW'] 	# ==> SR:  0.7553  
+	#settings['markets']      = ['CASH', 'MS', 'STT'] 		# ==> SR:  0.7094
+	#settings['markets']      = ['CASH', 'ETFC', 'HBAN'] 	# ==> SR:  1.4802
 	
 	### Cointegrating tech companies
-	#settings['markets']      = ['CASH', 'AAPL', 'APH'] 	# ==> SR:  0.9213
-	#settings['markets']      = ['CASH', 'FB', 'QCOM'] 		# ==> SR:  1.2283
-	#settings['markets']      = ['CASH', 'FB', 'FLIR'] 		# ==> SR:  1.1206
-	#settings['markets']      = ['CASH', 'HPQ', 'FOXA'] 	# ==> SR:  1.0103
-	#settings['markets']      = ['CASH', 'HPQ', 'CTL'] 		# ==> SR:  0.1336
-	#settings['markets']      = ['CASH', 'QCOM', 'VRSN'] 	# ==> SR: -0.5183
-	#settings['markets']      = ['CASH', 'CRM', 'PBI'] 		# ==> SR:  0.2069
-	#settings['markets']      = ['CASH', 'FLIR', 'NWSA'] 	# ==> SR:  0.4272
-	#settings['markets']      = ['CASH', 'FLIR', 'VIAB'] 	# ==> SR: -1.1284
-	#settings['markets']      = ['CASH', 'JNPR', 'XRX'] 	# ==> SR: -0.6233
+	#settings['markets']      = ['CASH', 'AAPL', 'APH'] 	# ==> SR:  0.6581
+	#settings['markets']      = ['CASH', 'FB', 'QCOM'] 		# ==> SR:  1.2483
+	#settings['markets']      = ['CASH', 'FB', 'FLIR'] 		# ==> SR:  0.9742
+	#settings['markets']      = ['CASH', 'HPQ', 'FOXA'] 	# ==> SR:  1.1262
+	#settings['markets']      = ['CASH', 'HPQ', 'CTL'] 		# ==> SR: -0.1811
+	#settings['markets']      = ['CASH', 'QCOM', 'VRSN'] 	# ==> SR: -0.3518
+	#settings['markets']      = ['CASH', 'CRM', 'PBI'] 		# ==> SR:  0.5599
+	#settings['markets']      = ['CASH', 'FLIR', 'NWSA'] 	# ==> SR:  0.7793
+	#settings['markets']      = ['CASH', 'FLIR', 'VIAB'] 	# ==> SR: -1.2582
+	#settings['markets']      = ['CASH', 'JNPR', 'XRX'] 	# ==> SR:  0.2037
 
 	### Cointegrating aerospace companies
-	#settings['markets']      = ['CASH', 'HON', 'NOC'] 		# ==> SR: -0.6211
+	#settings['markets']      = ['CASH', 'HON', 'NOC'] 		# ==> SR: -0.5076
 
 	### Cointegrating Oil-Gas companies
-	#settings['markets']      = ['CASH', 'DNR', 'NBL'] 		# ==> SR: -0.3764
+	#settings['markets']      = ['CASH', 'DNR', 'NBL'] 		# ==> SR:  0.1246
 
 	### Cointegrating Real Estate companies
-	#settings['markets']      = ['CASH', 'GGP', 'MAC'] 		# ==> SR:  1.6251
+	#settings['markets']      = ['CASH', 'GGP', 'MAC'] 		# ==> SR:  1.9376
 
 	### Cointegrating healthcare companies
-	#settings['markets']      = ['CASH', 'MDT', 'ZTS'] 		# ==> SR: -0.7388
-	#settings['markets']      = ['CASH', 'MRK', 'MJN'] 		# ==> SR:  0.7005
+	#settings['markets']      = ['CASH', 'MDT', 'ZTS'] 		# ==> SR: -0.9783
+	#settings['markets']      = ['CASH', 'MRK', 'MJN'] 		# ==> SR:  0.6890
 	#settings['markets']      = ['CASH', 'AET', 'HUM'] 		# ==> SR:  0.6733
-	#settings['markets']      = ['CASH', 'AGN', 'ZTS'] 		# ==> SR: -0.4472
-	#settings['markets']      = ['CASH', 'CAH', 'ZTS'] 		# ==> SR: -0.8777
-	#settings['markets']      = ['CASH', 'VRTX', 'ZTS'] 	# ==> SR: -1.0795
+	#settings['markets']      = ['CASH', 'AGN', 'ZTS'] 		# ==> SR: -0.4765
+	#settings['markets']      = ['CASH', 'CAH', 'ZTS'] 		# ==> SR: -0.6124
+	#settings['markets']      = ['CASH', 'VRTX', 'ZTS'] 	# ==> SR: -0.6292
 
 
 	### Cointegrating industries
-	#settings['markets']      = ['CASH', 'EMR', 'MAS'] 		# ==> SR:  0.2442
-	#settings['markets']      = ['CASH', 'HON', 'BMS'] 		# ==> SR: -0.4319
-	#settings['markets']      = ['CASH', 'LMT', 'FLR'] 		# ==> SR: -0.1886
-	#settings['markets']      = ['CASH', 'AME', 'GRMN'] 	# ==> SR:  0.1869
-	#settings['markets']      = ['CASH', 'AME', 'GT'] 		# ==> SR: -0.4461
-	#settings['markets']      = ['CASH', 'AME', 'HRS'] 		# ==> SR:  0.9693
-	#settings['markets']      = ['CASH', 'AME', 'KSU'] 		# ==> SR:  0.2429
-	#settings['markets']      = ['CASH', 'AME', 'MLM'] 		# ==> SR: -0.1905
+	#settings['markets']      = ['CASH', 'EMR', 'MAS'] 		# ==> SR: -0.0769
+	#settings['markets']      = ['CASH', 'HON', 'BMS'] 		# ==> SR: -0.4541
+	#settings['markets']      = ['CASH', 'LMT', 'FLR'] 		# ==> SR:  0.2849
+	#settings['markets']      = ['CASH', 'AME', 'GRMN'] 	# ==> SR:  -0.3688
+	#settings['markets']      = ['CASH', 'AME', 'GT'] 		# ==> SR: -0.2889
+	#settings['markets']      = ['CASH', 'AME', 'HRS'] 		# ==> SR:  0.5482
+	#settings['markets']      = ['CASH', 'AME', 'KSU'] 		# ==> SR:  0.0899
+	#settings['markets']      = ['CASH', 'AME', 'MLM'] 		# ==> SR: -0.1210
 	#settings['markets']      = ['CASH', 'AME', 'PKI'] 		# ==> SR:  0.3429
-	#settings['markets']      = ['CASH', 'AME', 'TYC'] 		# ==> SR: -0.3951
-	#settings['markets']      = ['CASH', 'AME', 'VMC'] 		# ==> SR: -0.2285
+	#settings['markets']      = ['CASH', 'AME', 'TYC'] 		# ==> SR:  0.0938
+	#settings['markets']      = ['CASH', 'AME', 'VMC'] 		# ==> SR: -0.0856
 
 	### Cointegrating energy companies
-	#settings['markets']      = ['CASH', 'COP', 'EOG'] 		# ==> SR: -0.3827
-	#settings['markets']      = ['CASH', 'XOM', 'CHK'] 		# ==> SR: -1.1045
-	#settings['markets']      = ['CASH', 'HAL', 'NBR'] 		# ==> SR: 0.9218
-	#settings['markets']      = ['CASH', 'CMS', 'XEL'] 		# ==> SR: 1.8451
-	#settings['markets']      = ['CASH', 'D', 'DUK'] 		# ==> SR: -0.1661
-	#settings['markets']      = ['CASH', 'D', 'FE'] 		# ==> SR: 0.4157
-	#settings['markets']      = ['CASH', 'D', 'PSX'] 		# ==> SR:  1.1026
+	#settings['markets']      = ['CASH', 'COP', 'EOG'] 		# ==> SR:  0.2611
+	#settings['markets']      = ['CASH', 'XOM', 'CHK'] 		# ==> SR: -0.7106
+	#settings['markets']      = ['CASH', 'HAL', 'NBR'] 		# ==> SR: 0.2698
+	#settings['markets']      = ['CASH', 'CMS', 'XEL'] 		# ==> SR: 1.6298
+	#settings['markets']      = ['CASH', 'D', 'DUK'] 		# ==> SR:  0.0612
+	#settings['markets']      = ['CASH', 'D', 'FE'] 		# ==> SR: 0.1039
+	#settings['markets']      = ['CASH', 'D', 'PSX'] 		# ==> SR:  0.9998
 	#settings['markets']      = ['CASH', 'DUK', 'FE'] 		# ==> SR:  1.1402
-	#settings['markets']      = ['CASH', 'HP', 'NE'] 		# ==> SR: -0.1321
-	#settings['markets']      = ['CASH', 'NEE', 'EOG'] 		# ==> SR: -0.7104
+	#settings['markets']      = ['CASH', 'HP', 'NE'] 		# ==> SR: -0.0634
+	#settings['markets']      = ['CASH', 'NEE', 'EOG'] 		# ==> SR: -0.2656
+
 
 
 
@@ -325,11 +339,7 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, settings):
 
 
 	### Load stock data and assure that dates match
-	
-	data = pd.DataFrame({'DATE' : DATE,'x_t' : CLOSE[:,1], 'y_t' : CLOSE[:,2]}) # ... create dataframe with the pair of assets
-	data['DATE'] = data['DATE'].apply(toDate)
-	data = data.set_index('DATE')
-	data = data.dropna(axis=0,how='any') # .. drop NaN
+	data = preprocess_data(DATE, CLOSE[:,1:3])
 
 
 
@@ -341,7 +351,7 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, settings):
 
 
 
-	### Run these routines every day
+	### Update parameters once a month
 	if toDate(DATE[-1]).day == 1: 
 		settings['pairs']['pair1'].update_all(data)
 
@@ -359,8 +369,6 @@ def myTradingSystem(DATE, OPEN, HIGH, LOW, CLOSE, settings):
 
 
 
-
-
 ################################# MY FUNCTIONS #################################
 
 def toDate(x):
@@ -370,13 +378,15 @@ def toDate(x):
 	return datetime.datetime(int(str(x)[:4]), int(str(x)[4:6]), int(str(x)[6:8]))
 
 
-
-
-
-
-
-
-
+def preprocess_data(DATE,CLOSE):
+	"""
+	Returns a prerpocessed data for the selected pair	
+	"""
+	data = pd.DataFrame({'DATE' : DATE,'x_t' : CLOSE[:,0], 'y_t' : CLOSE[:,1]}) # ... create dataframe with the pair of assets
+	data['DATE'] = data['DATE'].apply(toDate)
+	data = data.set_index('DATE')
+	data = data.dropna(axis=0,how='any') # .. drop NaN
+	return data
 
 
 
