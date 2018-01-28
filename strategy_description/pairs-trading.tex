@@ -1,0 +1,443 @@
+% This is LLNCS.DEM the demonstration file of
+% the LaTeX macro package from Springer-Verlag
+% for Lecture Notes in Computer Science,
+% version 2.4 for LaTeX2e as of 16. April 2010
+%
+\documentclass{paper}
+%
+\usepackage{amsmath}
+\usepackage{makeidx}  
+\usepackage{float}
+\usepackage{listings}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{boxedminipage}
+\usepackage{graphicx}
+
+\lstset{language=Python} 
+
+\begin{document}
+
+
+
+\section{Implemented Strategy}\label{section_implemented_strategy}
+
+The implemented strategy is a simple pairs trading strategy, in which we trade on the mean reversion of a time series, given by the difference of two cointegrating assets. 
+
+Let us suppose that the daily closing price of two assets $X$ and $Y$ at time $t$ is denoted with $x_t$ and $y_t,$ respectively. We define the spread $z_t$ as 
+
+\begin{equation}\label{definition_spread}
+z_t := y_t - \beta \cdot x_t
+\end{equation}
+where $\beta$ is the \textit{hedge ratio} of $Y$ against $X$ (given by the coefficient of the linear regression of $Y$ agains $X$).
+
+If we denote with $\mu$ and $\sigma$ the mean and the standard deviation of $\{z_t\}$ respectively, we obtain the $z_{score}$ of $\{z_t\},$ defined as 
+
+\begin{equation}
+z_{score,t} = \frac{z_t - \mu}{\sigma}.
+\end{equation}
+
+We define the entry and exit signals in the following way:
+
+\begin{itemize}
+
+\item[$1)$] \textbf{Entry signal}: If no position is taken:
+	\begin{itemize}
+	\item[$\bullet$] if $z_{score,t} \geq 2: $ take SHORT position in $z_t,$ i.e. SHORT $y_t$ and
+	BUY $\beta\cdot x_t$
+	\item[$\bullet$] if $z_{score,t} \leq -2: $ take LONG position in $z_t,$ i.e. BUY $y_t$ and SHORT $\beta \cdot x_t$
+	\end{itemize}
+
+\item[$2)$] \textbf{Exit signal}: If position has beet taken at time $t_0$ for any time $t>t_0$:
+
+	\begin{itemize}
+	\item[$\bullet$] if SHORT position has been taken in $z_{t_0}$ and $z_{score,t} \leq 0:$ CLOSE position, i.e. BUY $y_t$ and SHORT $\beta\cdot x_t$
+	\item[$\bullet$] if LONG position has been taken in $z_{t_0}$ and $z_{score,t} \geq 0:$ CLOSE position, i.e. SHORT $y_t$ and BUY $\beta\cdot x_t$
+	\item[$\bullet$] if the current drawdown exceeds $20\%,$ CLOSE position and do not open another one before $|z_{score,t}| \leq 0.5$
+	\end{itemize}
+
+\end{itemize}
+
+A portfolio of $15$ pairs ($30$ assets) has been considered, where each pair has been selected among a set of assets from the same type (financial sector, technology, currencies, futures etc). In order to generate a pair of assets, a cointegration test has been performed between all the assets in a particular sector, and only those with significant statistical evidence have been selected. Furthermore, a portfolio consisting of only one pair at a time has been tested during a time interval of $2$ years (referred as \textit{in-sample period}). Only pairs having in-sample Sharpe ratio higher then $0.5$ have been included in the final portfolio. Finally, a slippage of $5\%$ has been included, in order to model trading costs.
+
+The is-sample performance of the final portfolio can be seen in Figure~\ref{fig:performance_is}, with overall Sharpe ratio of $2.7214.$ 
+\begin{figure}[H]
+\centerline{\includegraphics[scale=0.35]{figures/performance_is}}
+\caption{In-sample performance of the portfolio of pairs}
+\label{fig:performance_is}
+\end{figure}
+
+The performance of the same portfolio during the period January-August $2016$ (referred as \textit{out-of-sample period}) can be found in Figure~\ref{fig:performance_oos} with Sharpe ratio $2.1301$.
+\begin{figure}[H]
+\centerline{\includegraphics[scale=0.35]{figures/performance_oos}}
+\caption{Out-of-sample performance of the portfolio of pairs}
+\label{fig:performance_oos}
+\end{figure}
+
+
+\section{Detailed description}\label{section_detailed_description}
+
+In this section, we provide a detailed description of the research and implementation of the trading algorithm.
+
+\subsection{Pairs selection}
+
+In order to form a pair of assets, which could be a suitable candidate of the final portfolio, we consider different market sectors: \textit{Financial, IT services, Currencies, Agricultural, Aerospace, Oil and Gas, Futures, Chemical, Tobacco, Clothing, Real Estate, Healthcare, Commodities, Industry and Energy.} Assets withing each sector are tested for cointegration and candidate pairs are formed.
+
+The cointegration test can be performed in \textbf{python} via
+\begin{lstlisting}
+statsmodels.tsa.stattools.coint(x,y)
+\end{lstlisting}
+
+The p-value of the cointegration test is returned and we consider pairs with p-value in the range $0.001-0.005$ (hence, high statistical evidence of cointegration).
+
+Finally, a pairs trading strategy on each of the cointegrating pairs is tested on the is-sample period and a pair is included in the final portfolio only if its Sharpe ratio is above $0.5.$
+
+\subsection{Half-life of a pair and lookback period}
+
+In order to update certain parameters (the mean and standard deviation of $\{z_t\}$ as well as the hedge ratio $\beta$), we need a lookback period, which is suitable for each pair. This can be done by exploiting the half-life of a mean reverting process.
+
+A mean-reverting process have to satisfy the Ornstein-Uhlenbeck stochastic differential equation:
+
+\begin{displaymath}
+dz_t = (\lambda z_{t-1} + \mu)dt + d \varepsilon
+\end{displaymath}
+with $\lambda < 0$ (hence, a positive value of $\lambda$ provides an additional test for mean reverting series). We can estimate $\lambda$ by a linear regression of $\Delta z_t = z_t - z_{t-1}$ against $z_{t-1}.$ The half-life of the process (i.e. the expected time for the process to revert) is given by
+\begin{displaymath}
+\textit{half-life} = -\frac{\log(2)}{\lambda}.
+\end{displaymath}
+
+It is a good practice to set a lookback period equal to a small multiple of the half-life. In our strategy, we set
+\begin{displaymath}
+\textit{lookback} = \min\{1.5*\textit{half-life}, 30\}
+\end{displaymath}
+we estimate the mean and standard deviation of $z_t$ as well as the hedge ratio $\beta$ on the last \textit{lookback} days.
+
+\subsection{Dynamic hedge ratio}
+
+In order to make the trading system more robust, we dynamically estimate the hedge ratio $\beta$ once a month based on the \textit{lookback} period of time. This is done by a linear regression of $\{x_t\}$ against $\{y_t\},$ hence $\beta$ is given by
+
+\begin{displaymath}
+\beta = \arg \min_{\alpha_0, \beta_0} \sum_{s = t - \textit{lookback}}^t |y_s - (\alpha_0 + \beta_0 \cdot x_s)|^2.  
+\end{displaymath}
+
+
+\subsection{Pairs evaluation}
+
+Pairs have been selected based on the following two criteria:
+
+\begin{itemize}
+\item[$1)$] p-value less then $0.001$ from the cointegration test
+\item[$2)$] pairs satisfying $1)$ have been tested during the \textit{in-sample} period ($2014-2016$) and only those which achieved Sharpe ratio above $0.5$ have been included into the final portfolio.
+\end{itemize}
+
+Assets from the following markets have been tested and the Sharpe ratio of each pair has been obtained for the in-sample period:
+
+\begin{itemize}
+
+\item[$\bullet$] \textbf{Financial sector}: \texttt{BAC, BK, C, GS, JPM, MS, USB, WFC, BBT, CMA, ETFC, FITB, HBAN, KEY, MTB, NTRS, PBCT, PNC, RF, SCHW, STI, STT, ZION}.
+\begin{center}
+\begin{tabular}{| c | c | c | }
+\hline
+\textbf{Pair} & \textbf{Sharpe ratio}  & \textbf{Included} \\ \hline
+\texttt{JPM-SCHW} & $0.7553$ & Yes \\ \hline
+\texttt{MS-STT} & $0.7094$ & Yes \\ \hline
+\texttt{ETFC-HBAN} & $1.4802$ & Yes  \\ \hline
+\end{tabular}
+\end{center}
+\item[$\bullet$] \textbf{IT Services}: \texttt{AAPL, ACN, AMZN, T, CSCO, 
+CMCSA, EBAY, EMC, FB, GOOG, GOOGL, HPQ, INTC, IBM, MSFT, ORCL, QCOM, 
+TXN, TWX, FOXA, VZ, DIS, ADBE, ADI, ADSK, AKAM, AMAT, APH, AVGO, CA, 
+CBS, CERN, CRM, CSC, CTL, CTSH, CTXS, DISCA, DISCK, DNB, EA, EXPE, FFIV, FIS, 
+FISV, FLIR, FTR, GCI, INTU, IPG, JNPR, KLAC, LLTC, LRCX, LVLT, MCHP, MSI, MU,
+NFLX, NTAP, NVDA, NWSA, OMC, PAYX, PBI, PCLN, RHT, STX, SYMC, TDC, TEL, 
+TRIP, VIAB, VRSN, WDC, WIN, XLNX, XRX, YHOO}.
+\begin{center}
+\begin{tabular}{| c | c | c | }
+\hline
+\textbf{Pair} & \textbf{Sharpe ratio}  & \textbf{Included} \\ \hline
+\texttt{AAPL-APH} & $0.6581$ & Yes  \\ \hline
+\texttt{FB-QCOM} & $1.2283$ & Yes  \\ \hline
+\texttt{FB-FLIR} & $0.9742$ &  \\ \hline
+\texttt{HPQ-FOXA} & $1.1262$ & Yes  \\ \hline
+\texttt{HPQ-CTL} & $-0.1811$ &  \\ \hline
+\texttt{QCOM-VRSN} & $-0.3518$ &  \\ \hline
+\texttt{CRM-PBI} & $0.5599$ & Yes \\ \hline
+\texttt{FLIR-NWSA} & $0.7793$ & Yes \\ \hline
+\texttt{FLIR-VIAB} & $-1.2582$ &  \\ \hline
+\texttt{JNPR-XRX} & $0.2037$ &   \\ \hline
+\end{tabular}
+\end{center}
+
+
+\item[$\bullet$] \textbf{Currencies}: \texttt{F\_AD, F\_BP, F\_CD, F\_DX, F\_EC, F\_JY , F\_MP, F\_SF}.
+
+No cointegrating pairs found.
+
+\item[$\bullet$] \textbf{Agricultural Sector}: \texttt{F\_BO, F\_C, F\_CC, F\_CT,
+F\_FC, F\_KC, F\_LB, F\_LC, F\_LN, F\_NR, F\_O, F\_OJ, F\_S, F\_SB,
+F\_SM, F\_W, ADM, DE}.
+
+No cointegrating pairs found.
+
+
+\item[$\bullet$] \textbf{Aerospace Sector}: \texttt{BA, GD, HON, LMT, RTN, UTX, COL, HRS, LLL, NOC, TXT}.
+\begin{center}
+\begin{tabular}{| c | c | c | }
+\hline
+\textbf{Pair} & \textbf{Sharpe ratio}  & \textbf{Included} \\ \hline
+\texttt{HON-NOC} & $-0.5076$ &   \\ \hline
+\end{tabular}
+\end{center}
+
+
+\item[$\bullet$] \textbf{Oil and Gas Sector}: \texttt{MPC, PSX, TSO, VLO, APC, APA, COP, DVN, OXY, CHK, COG, DNR, EQT, HES, NBL, NFX, PXD, QEP, 
+RRC, SWN, XEC}.
+\begin{center}
+\begin{tabular}{| c | c | c | }
+\hline
+\textbf{Pair} & \textbf{Sharpe ratio}  & \textbf{Included} \\ \hline
+\texttt{DNR-NBL} & $0.1246$ &   \\ \hline
+\end{tabular}
+\end{center}
+
+
+\item[$\bullet$] \textbf{ Futures}: \texttt{F\_AD, F\_BO, F\_BP, F\_C, F\_CC, F\_CD, F\_CL, F\_CT, F\_DX, F\_EC, F\_ED, F\_ES, F\_FC, F\_FV, F\_GC, F\_HG, F\_HO, F\_JY, F\_KC, F\_LB, F\_LC, F\_LN, F\_MD, F\_MP, F\_NG, F\_NQ, F\_NR, F\_O, F\_OJ, F\_PA, F\_PL, F\_RB, F\_RU, F\_S, F\_SB, F\_SF, F\_SI, F\_SM, F\_TU, F\_TY, F\_US, F\_W, F\_XX, F\_YM}.
+
+No cointegrating pairs found.
+
+
+\item[$\bullet$] \textbf{Chemical Sector}: \texttt{DOW, DD, MON, APD, CF, ECL, EMN, FMC, IFF, LYB, MOS, PPG, SHW}.
+
+No cointegrating pairs found.
+
+
+\item[$\bullet$] \textbf{Tobacco Sector}: \texttt{MO, PM, RAI}.
+
+No cointegrating pairs found.
+
+
+\item[$\bullet$] \textbf{Clothing Sector}: \texttt{NKE, COH, GPS, KORS, LB, PVH, RL, ROST, UA, URBN, VFC}.
+
+No cointegrating pairs found.
+
+
+\item[$\bullet$] \textbf{Real Estate Sector}: \texttt{SPG, AIV, AMT, AVB, BXP, CBG, EQR, ESS, GGP, HCP, HST, IRM, KIM, LUK, MAC, PLD, PSA, VNO, VTR}.
+\begin{center}
+\begin{tabular}{| c | c | c | }
+\hline
+\textbf{Pair} & \textbf{Sharpe ratio}  & \textbf{Included} \\ \hline
+\texttt{GGP-MAC} & $1.9376$ & Yes  \\ \hline
+\end{tabular}
+\end{center}
+
+
+\item[$\bullet$] \textbf{Healthcare Sector}: \texttt{ABT, ABBV, AMGN, BAX, BMY, CVS, GILD, JNJ, LLY, MDT, MRK, PFE, UNH, WBA, ABC, AET, AGN, ALXN, BCR, BDX, BSX, CAH, CELG, CI, DGX, DHR, DVA, ESRX, EW, HUM, ISRG, LH, MCK, MJN, MNK, MYL, PDCO, PRGO, REGN, STJ, SYK, THC, TMO, UHS, VAR, VRTX, XRAY, ZTS}.
+\begin{center}
+\begin{tabular}{| c | c | c | }
+\hline
+\textbf{Pair} & \textbf{Sharpe ratio}  & \textbf{Included} \\ \hline
+\texttt{MDT-ZTS} & $-0.9783$ &   \\ \hline
+\texttt{MRK-MJN} & $0.6890$ &  Yes \\ \hline
+\texttt{AET-HUM} & $0.6733$ &  Yes \\ \hline
+\texttt{AGN-ZTS} & $-0.4765$ &   \\ \hline
+\texttt{CAH-ZTS} & $-0.6124$ &   \\ \hline
+\texttt{VRTX-ZTS} & $-0.6292$ &   \\ \hline
+\end{tabular}
+\end{center}
+
+
+\item[$\bullet$] \textbf{Industrial Sector}: \texttt{BA, CAT, EMR, FDX, F, GD, GM, HON, LMT, NSC, RTN, UNP, UPS, UTX, A, ALLE, AME, BLL, BMS, BWA, CHRW, CMI, COL, CTAS, DE, DLPH, DOV, ETN, EXPD, FLR, FLS, GLW, GRMN, GT, HOG, HRS, IR, ITW, JCI, JEC, JOY, KSU, LLL, MAS, MLM, NLSN, NOC, OI, PCAR, PH, PKI, PNR, PWR, R, RHI, ROK, ROP, SEE, SNA, SWK, TXT, TYC, URI, VMC, WAT, XYL}.
+\begin{center}
+\begin{tabular}{| c | c | c | }
+\hline
+\textbf{Pair} & \textbf{Sharpe ratio}  & \textbf{Included} \\ \hline
+\texttt{EMR-MAS} & $-0.0769$ &   \\ \hline
+\texttt{HON-BMS} & $-0.4541$ &   \\ \hline
+\texttt{LMT-FLR} & $0.2849$ &   \\ \hline
+\texttt{AME-GRMN} & $-0.3688$ &   \\ \hline
+\texttt{AME-GT} & $-0.2889$ &   \\ \hline
+\texttt{AME-HRS} & $0.5482$ & Yes  \\ \hline
+\texttt{AME-KSU} & $0.0899$ &  \\ \hline
+\texttt{AME-MLM} & $-0.1210$ &  \\ \hline
+\texttt{AME-PKI} & $0.3429$ &  \\ \hline
+\texttt{AME-TYC} & $0.0938$ &  \\ \hline
+\texttt{AME-VMC} & $-0.0856$ &  \\ \hline
+\end{tabular}
+\end{center}
+
+
+\item[$\bullet$] \textbf{Energy Sector}: \texttt{F\_CL, F\_HO, F\_NG, F\_RB, AEP, APC, APA, CVX, COP, DVN, EXC, XOM, HAL, NOV, OXY, SLB, SO, AEE, AES, BHI, CHK, CMS, CNP, CNX, COG, D, DNR, DO, DTE, DUK, ED, EIX, EOG, EQT, ESV, ETR, FE, FSLR, FTI, HES, HP, KMI, MPC, MRO, MUR, NBL, NBR, NE, NEE, NFX, NI, NRG, OKE, PCG, PEG, PNW, PPL, PSX, PXD, QEP, RIG, RRC, SCG, SE, SRE, SWN, TSO, VLO, WEC, WMB, XEC, XEL}.
+\begin{center}
+\begin{tabular}{| c | c | c | }
+\hline
+\textbf{Pair} & \textbf{Sharpe ratio}  & \textbf{Included} \\ \hline
+\texttt{COP-EOG} & $0.2611$ &   \\ \hline
+\texttt{XOM-CHK} & $-0.7106$ &   \\ \hline
+\texttt{HAL-NBR} & $0.2698$ &    \\ \hline
+\texttt{CMS-XEL} & $1.6298$ & Yes  \\ \hline
+\texttt{D-DUK} & $0.0612$ &   \\ \hline
+\texttt{D-FE} & $0.1039$ &   \\ \hline
+\texttt{D-PSX} & $0.9998$ & Yes   \\ \hline
+\texttt{DUK-FE} & $1.1402$ & Yes   \\ \hline
+\texttt{HP-NE} & $-0.0634$ &    \\ \hline
+\texttt{NEE-EOG} & $-0.2656$ &    \\ \hline
+\end{tabular}
+\end{center}
+
+\end{itemize}
+
+\subsection{Risk management}
+
+In order to limit the potential loses of the algorithm, we implement a risk management logic, which closes the current taken position whenever the current drawdown exceeds $20\%$ (this usually happens for high values of $|z_{score,t}|$). Once a position is closed due to exceeded maximum drawdown, the algorithm is not allowed to trade until  $z_{score,t}$ returns under a reasonable values ($|z_{score,t}| \leq 0.5$).
+
+We compute the drawdown in the following manner: let us enter a (long or short) position at time $t_0$ with allocated capital $p_x$ and $p_y$ (the portion of the available capital, invested in $X$ and $Y$ respectively). The value of the portfolio at time $t_0$ is defined as 
+
+\begin{displaymath}
+P_{t_0} := \frac{p_x}{|p_x| + |p_y|}x_{t_0} + \frac{p_y}{|p_x| + |p_y|}y_{t_0}.
+\end{displaymath}
+
+Let us denote with $\hat P_{[t_0,t]}$ the maximum value, achieved by the portfolio over the time interval $[t_0,t],$ i.e.
+
+\begin{displaymath}
+\hat P_{[t_0,t]} := \max_{s \in [t_0,t]} P_s.
+\end{displaymath}
+
+Then we compute the drawdown of the portfolio at time $t$ as 
+
+\begin{displaymath}
+DD_t := \frac{P_t - \hat P_{[t_0,t]}}{\hat P_{[t_0,t]}}.
+\end{displaymath}
+
+A previously opened position is closed due to exceeded maximum drawdown, whenever $DD_t$ goes below $-0.2.$
+
+
+
+
+\subsection{Trading logic}
+The trading logic can be summarized in the following algorithm:
+\begin{algorithm}[H]
+\caption{Trading logic}
+\label{trading_logic}
+\begin{boxedminipage}{117mm}
+\begin{algorithmic}[1]
+\STATE Set POSITION = NONE and $p = [0,0]$
+\FOR{each $day$ in $trading \ period$}
+\STATE get CLOSE price of $X,$ $Y$
+\IF{$day == 1$ (first day of the month)}
+\STATE update $beta$ and $lookback$
+\ENDIF
+\STATE compute $z_{score}$
+
+\IF{POSITION == NONE}
+	\IF{$z_{score,t} \geq 2$}
+		\STATE BUY $\beta \cdot X,$ SELL $Y$
+		\STATE set POSITION = ENTERED\_ABOVE, $p = [\beta, -1]$
+	\ENDIF
+	\IF{$z_{score,t} \leq -2$}
+		\STATE SELL $\beta \cdot X,$ BUY $Y$
+		\STATE set POSITION = ENTERED\_BELOW, $p = [-\beta, 1]$
+	\ENDIF
+\ENDIF
+
+\IF{POSITION == MAX\_DD\_EXCEEDED and $|z_{score,t}| \leq 0.5$}
+	\STATE set POSITION = NONE (return to normal state)
+\ENDIF
+
+\IF{POSITION $\notin$ \{NONE, MAX\_DD\_EXCEEDED\} }
+	\IF{POSITION == ENTERED\_ABOVE and $z_{score,t} \leq 0$}
+		\STATE set POSITION = NONE, $p = [0,0]$ (close position)
+	\ELSIF{POSITION == ENTERED\_BELOW and $z_{score,t} \geq 0$}
+		\STATE set POSITION = NONE, $p = [0,0]$ (close position)
+	\ELSE
+		\STATE compute DRAWDOWN
+		\IF{DRAWDOWN $\geq$ MAX\_DRAWDOWN}
+			\STATE set POSITION = MAX\_DD\_EXCEEDED, $p = [0,0]$
+			\STATE (close position due to exceeded maximum drawdown)
+		\ENDIF
+	\ENDIF
+\ENDIF
+\STATE return $p$
+\ENDFOR
+\end{algorithmic}
+\end{boxedminipage}
+\end{algorithm}
+
+Note that the parameter $p$ in Algorithm\ref{trading_logic} is the portion of capital to be allocated. In order to make the whole algorithm reproducible, it has been implemented into a separate python class.
+
+\subsection{Code execution}
+
+We provide all the source code of the trading algorithm as well as the research done. In order to reproduce the results stated in the previous sections, the reader should have running \textbf{python} and the following libraries: \textbf{numpy, scipy, pandas} and \textbf{quantiacsToolbox}.
+
+The evaluation of the single pairs of stocks is implemented in the \textbf{pairs.py} file. Each pair can be executing by commenting it out in the source code (lines $260-317$). The file can be executed by
+\begin{lstlisting}
+python pairs.py
+\end{lstlisting}
+
+The implementation of the in-sample and out-of-sample portfolio evaluation is held in \textbf{portfolio-IS.py} and \textbf{portfolio-OOS.py} respectively. Both the files can be run by 
+
+\begin{lstlisting}
+python portfolio-IS.py
+\end{lstlisting}
+and 
+\begin{lstlisting}
+python portfolio-OOS.py
+\end{lstlisting}
+
+The research done is forming the pairs of securities can be found in \textbf{research/identify-pairs.ipynb}. In order the run the code, \textbf{ipython notebook} is required, but we provide also an \textit{html} file containing all the results (\textbf{research/identify-pairs.html}).
+
+Finally, we provide all the data downloaded from Quantiacs (for sake of time saving), which is contained in the \textbf{tickerData} folder.
+
+
+\subsection{Comments and further ideas}
+
+In order to improve the performance of the algorithm, the following ideas could be implemented:
+
+\begin{itemize}
+\item[1)] More robust cointegration research could be done on the assets. Although the cointegration test performed better then correlation and minimum distance between assets, I believe there is still a lot of space for a better pairs selection.
+
+\item[2)] Additional tests, such as the Hurst exponent and p-value of ADF test on the residuals of $y_t - \beta \cdot x_t$ could be used as additional entry (and exit signals). I did not put a lot of effort in that direction, but a better research could lead to improved performance.
+
+\item[3)] Although pairs trading strategies are usually market neutral, I did not monitored the beta of the portfolio with respect to the overall market (or the SPY index).
+
+\item[4)] The allocation of capital is not optimized (the capital is allocated equally between pairs). I believe there is a lot of space for improvement in this direction (simple idea could be capital proportional to the Sharpe ratio obtained during the \textit{in-sample} period).
+
+\item[5)] The risk management I am using limits the drawdown on a single trades, but does not take in consideration sequence of loosing trades. Hence the overall loss might exceed $20\%.$
+
+\item[6)] Some parameters (such as the mean and standard deviation of $y_t - \beta \cdot x_t$) are estimated using simple moving average. More sophisticated methods such as exponential moving average or Kalman filter (widely suggested in literature) will almost surely improve the performance of the algorithm.
+
+\item[7)] Finally, I decided to update the parameters once a month, in order to prevent overfitting the training data, nevertheless I did not optimized this parameter (hence twice a month might improve the performance).
+\end{itemize}
+
+
+
+%
+% ---- Bibliography ----
+%
+\begin{thebibliography}{5}
+
+\bibitem{Pairs1}
+Caldeira, J. and Moura, G. V.: \textit{Selection of a Portfolio of Pairs Based on Cointegration: A Statistical Arbitrage Strategy}, Available at SSRN: http://ssrn.com/abstract=219639, (2013) 
+
+\bibitem{Chan}
+Chan, E. P.: \textit{Algorithmic Trading: Winning Strategies and Their Rationale}, Wiley Finance, (2013)
+
+\bibitem{ohd}
+Gundersen, R.J.: \textit{Statistical Arbitrage: High Frequency Pairs Trading}, Maste thesis, Norwegian School of Economics, (2014)
+
+\bibitem{quantopian}
+Quantopian Lectures : https://www.quantopian.com/lectures
+
+\bibitem{quantostart}
+QuantStart: https://www.quantstart.com/
+
+\bibitem{Pairs2}
+Triantafyllopoulos, K. and Montana, G.: \textit{Dynamic modeling of mean-reverting spreads for statistical arbitrage}, Available at https://arxiv.org/pdf/0808.1710.pdf, (2009) 
+
+
+
+\end{thebibliography}
+
+\end{document}
+
+
+
